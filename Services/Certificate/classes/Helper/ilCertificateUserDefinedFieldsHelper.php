@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,7 +6,10 @@
  */
 class ilCertificateUserDefinedFieldsHelper
 {
-    public function createInstance() : ilUserDefinedFields
+    /**
+     * @return ilUserDefinedFields
+     */
+    public function createInstance()
     {
         return ilUserDefinedFields::_getInstance();
     }

@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,8 +6,11 @@
  */
 class ilCertificateObjUserTrackingHelper
 {
-    public function enabledLearningProgress() : bool
+    /**
+     * @return bool
+     */
+    public function enabledLearningProgress()
     {
-        return ilObjUserTracking::_enabledLearningProgress();
+        return \ilObjUserTracking::_enabledLearningProgress();
     }
 }

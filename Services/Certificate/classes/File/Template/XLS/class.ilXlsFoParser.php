@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,22 +6,58 @@
  */
 class ilXlsFoParser
 {
-    private ilSetting $settings;
-    private ilPageFormats $pageFormats;
-    private ilXMLChecker $xmlChecker;
-    private ilCertificateUtilHelper $utilHelper;
-    private ilCertificateXlstProcess $xlstProcess;
-    private ilLanguage $language;
-    private ilCertificateXlsFileLoader $certificateXlsFileLoader;
+    /**
+     * @var ilSetting
+     */
+    private $settings;
 
+    /**
+     * @var ilPageFormats
+     */
+    private $pageFormats;
+
+    /**
+     * @var ilXMLChecker
+     */
+    private $xmlChecker;
+
+    /**
+     * @var ilCertificateUtilHelper|null
+     */
+    private $utilHelper;
+
+    /**
+     * @var ilCertificateXlstProcess|null
+     */
+    private $xlstProcess;
+
+    /**
+     * @var ilLanguage|null
+     */
+    private $language;
+
+    /**
+     * @var ilCertificateXlsFileLoader|null
+     */
+    private $certificateXlsFileLoader;
+
+    /**
+     * @param ilSetting $settings
+     * @param ilPageFormats $pageFormats
+     * @param ilXMLChecker $xmlChecker
+     * @param ilCertificateUtilHelper|null $utilHelper
+     * @param ilCertificateXlstProcess|null $xlstProcess
+     * @param ilLanguage|null $language
+     * @param ilCertificateXlsFileLoader|null $certificateXlsFileLoader
+     */
     public function __construct(
         ilSetting $settings,
         ilPageFormats $pageFormats,
-        ?ilXMLChecker $xmlChecker = null,
-        ?ilCertificateUtilHelper $utilHelper = null,
-        ?ilCertificateXlstProcess $xlstProcess = null,
-        ?ilLanguage $language = null,
-        ?ilCertificateXlsFileLoader $certificateXlsFileLoader = null
+        ilXMLChecker $xmlChecker = null,
+        ilCertificateUtilHelper $utilHelper = null,
+        ilCertificateXlstProcess $xlstProcess = null,
+        ilLanguage $language = null,
+        ilCertificateXlsFileLoader $certificateXlsFileLoader = null
     ) {
         $this->settings = $settings;
         $this->pageFormats = $pageFormats;
@@ -55,6 +91,7 @@ class ilXlsFoParser
 
     /**
      * @param array $formData
+     * @param string $backgroundImageName
      * @return string
      * @throws Exception
      */
@@ -79,14 +116,14 @@ class ilXlsFoParser
         // additional font support
         $xsl = str_replace(
             'font-family="Helvetica, unifont"',
-            'font-family="' . $this->settings->get('rpc_pdf_font', 'Helvetica, unifont', '') . '"',
+            'font-family="' . $this->settings->get('rpc_pdf_font', 'Helvetica, unifont') . '"',
             $xsl
         );
 
-        $args = [
+        $args = array(
             '/_xml' => $content,
             '/_xsl' => $xsl
-        ];
+        );
 
         if (strcmp($formData['pageformat'], 'custom') == 0) {
             $pageheight = $formData['pageheight'];
@@ -97,27 +134,42 @@ class ilXlsFoParser
             $pagewidth = $pageformats[$formData['pageformat']]['width'];
         }
 
-        $params = [
+        $params = array(
             'pageheight' => $this->formatNumberString($this->utilHelper->stripSlashes($pageheight)),
             'pagewidth' => $this->formatNumberString($this->utilHelper->stripSlashes($pagewidth)),
             'backgroundimage' => '[BACKGROUND_IMAGE]',
             'marginbody' => implode(
                 ' ',
-                [
+                array(
                     $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['top'])),
                     $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['right'])),
                     $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['bottom'])),
                     $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['left']))
-                ]
+                )
+
+                /**
+                 * #Review
+                 *
+                 * warum schreiben wir als string nicht?:
+                 *
+                $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['top']))
+                . " " . $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['right']))
+                . " " . $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['bottom']))
+                . " " . $this->formatNumberString($this->utilHelper->stripSlashes($formData['margin_body']['left']))
+                 */
             )
-        ];
+        );
 
         $output = $this->xlstProcess->process($args, $params);
 
         return $output;
     }
 
-    private function formatNumberString(string $a_number) : string
+    /**
+     * @param string $a_number
+     * @return string
+     */
+    private function formatNumberString($a_number) : string
     {
         return str_replace(',', '.', $a_number);
     }

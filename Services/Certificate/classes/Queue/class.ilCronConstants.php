@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,8 +6,8 @@
  */
 class ilCronConstants
 {
-    public const ATTACHED = 'attached';
-    public const IN_PROGRESS = 'in_progress';
-    public const FAILED = 'failed';
-    public const FINISHED = 'finished';
+    const ATTACHED = 'attached'; // #Review unbenutzte Variable
+    const IN_PROGRESS = 'in_progress';
+    const FAILED = 'failed';
+    const FINISHED = 'finished';
 }

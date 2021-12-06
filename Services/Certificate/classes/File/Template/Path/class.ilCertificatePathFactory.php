@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2019 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,7 +6,7 @@
  */
 class ilCertificatePathFactory
 {
-    public function create(ilObject $object) : string
+    public function create(ilObject $object)
     {
         $type = $object->getType();
 
@@ -37,7 +37,7 @@ class ilCertificatePathFactory
                     'The type "%s" is currently not supported for certificates',
                     $type
                 ));
-                break;
+                break; // #Review <- kann weg wegen throw
         }
 
         return $certificatePath;

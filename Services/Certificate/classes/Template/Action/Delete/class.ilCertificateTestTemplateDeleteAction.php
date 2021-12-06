@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,9 +6,20 @@
  */
 class ilCertificateTestTemplateDeleteAction implements ilCertificateDeleteAction
 {
-    private ilCertificateDeleteAction $deleteAction;
-    private ilCertificateObjectHelper $objectHelper;
+    /**
+     * @var ilCertificateDeleteAction
+     */
+    private $deleteAction;
 
+    /**
+     * @var ilCertificateObjectHelper
+     */
+    private $objectHelper;
+
+    /**
+     * @param ilCertificateDeleteAction $deleteAction
+     * @param ilCertificateObjectHelper $objectHelper
+     */
     public function __construct(
         ilCertificateDeleteAction $deleteAction,
         ilCertificateObjectHelper $objectHelper
@@ -17,7 +28,12 @@ class ilCertificateTestTemplateDeleteAction implements ilCertificateDeleteAction
         $this->objectHelper = $objectHelper;
     }
 
-    public function delete($templateId, $objectId) : void
+    /**
+     * @param $templateId
+     * @param $objectId
+     * @return mixed
+     */
+    public function delete($templateId, $objectId)
     {
         $this->deleteAction->delete($templateId, $objectId);
     }

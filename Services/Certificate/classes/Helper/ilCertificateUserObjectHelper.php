@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,7 +6,11 @@
  */
 class ilCertificateUserObjectHelper
 {
-    public function lookupFields($user_id) : array
+    /**
+     * @param $user_id
+     * @return mixed
+     */
+    public function lookupFields($user_id)
     {
         return ilObjUser::_lookupFields($user_id);
     }

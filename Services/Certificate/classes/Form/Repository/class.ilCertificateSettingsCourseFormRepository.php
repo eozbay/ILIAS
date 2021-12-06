@@ -1,143 +1,364 @@
-<?php declare(strict_types=1);
-
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
-
-use ILIAS\Filesystem\Exception\FileAlreadyExistsException;
-use ILIAS\Filesystem\Exception\FileNotFoundException;
-use ILIAS\Filesystem\Exception\IOException;
 
 /**
  * @author  Niels Theen <ntheen@databay.de>
  */
-class ilCertificateSettingsCourseFormRepository implements ilCertificateFormRepository
+class ilCertificateSettingsFormRepository implements ilCertificateFormRepository
 {
-    private ilLanguage $language;
-    private ilCertificateSettingsFormRepository $settingsFromFactory;
-    private ilObjCourse $object;
-    private ilObjectLP $learningProgressObject;
-    private ilCertificateObjUserTrackingHelper $trackingHelper;
-    private ilCertificateObjectHelper $objectHelper;
-    private ilCertificateObjectLPHelper $lpHelper;
-    private ilTree $tree;
-    private ilSetting $setting;
+    /**
+     * @var int
+     */
+    private $objectId;
 
+    /**
+     * @var ilLanguage
+     */
+    private $language;
+
+    /**
+     * @var ilCtrl
+     */
+    private $controller;
+
+    /**
+     * @var ilAccess
+     */
+    private $access;
+
+    /**
+     * @var ilToolbarGUI
+     */
+    private $toolbar;
+
+    /**
+     * @var ilCertificatePlaceholderDescription
+     */
+    private $placeholderDescriptionObject;
+
+    /**
+     * @var ilPageFormats
+     */
+    private $pageFormats;
+
+    /**
+     * @var ilFormFieldParser
+     */
+    private $formFieldParser;
+
+    /**
+     * @var ilCertificateTemplateImportAction|null
+     */
+    private $importAction;
+
+    /**
+     * @var ilCertificateTemplateRepository
+     */
+    private $templateRepository;
+
+    /**
+     * @var string
+     */
+    private $certificatePath;
+
+    /**
+     * @var bool
+     */
+    private $hasAdditionalElements;
+
+    /**
+     * @var ilCertificateBackgroundImageFileService
+     */
+    private $backGroundImageFileService;
+
+    /**
+     * @param integer $objectId
+     * @param string $certificatePath
+     * @param ilLanguage $language
+     * @param ilCtrl $controller
+     * @param ilAccess $access
+     * @param ilToolbarGUI $toolbar
+     * @param ilCertificatePlaceholderDescription $placeholderDescriptionObject
+     * @param ilPageFormats|null $pageFormats
+     * @param ilFormFieldParser|null $formFieldParser
+     * @param ilCertificateTemplateImportAction|null $importAction
+     * @param ilLogger|null $logger
+     * @param ilCertificateTemplateRepository|null $templateRepository
+     */
     public function __construct(
-        ilObject $object,
+        int $objectId,
         string $certificatePath,
         bool $hasAdditionalElements,
         ilLanguage $language,
-        ilCtrl $ctrl,
+        ilCtrl $controller,
         ilAccess $access,
         ilToolbarGUI $toolbar,
         ilCertificatePlaceholderDescription $placeholderDescriptionObject,
-        ?ilObjectLP $learningProgressObject = null,
-        ?ilCertificateSettingsFormRepository $settingsFromFactory = null,
-        ?ilCertificateObjUserTrackingHelper $trackingHelper = null,
-        ?ilCertificateObjectHelper $objectHelper = null,
-        ?ilCertificateObjectLPHelper $lpHelper = null,
-        ?ilTree $tree = null,
-        ?ilSetting $setting = null
+        ilPageFormats $pageFormats = null,
+        ilFormFieldParser $formFieldParser = null,
+        ilCertificateTemplateImportAction $importAction = null,
+        ilLogger $logger = null,
+        ilCertificateTemplateRepository $templateRepository = null,
+        \ILIAS\Filesystem\Filesystem $filesystem = null,
+        ilCertificateBackgroundImageFileService $backgroundImageFileService = null
     ) {
-        $this->object = $object;
+        global $DIC;
 
+        $this->objectId = $objectId;
         $this->language = $language;
+        $this->controller = $controller;
+        $this->access = $access;
+        $this->toolbar = $toolbar;
+        $this->placeholderDescriptionObject = $placeholderDescriptionObject;
+        $this->certificatePath = $certificatePath;
+        $this->hasAdditionalElements = $hasAdditionalElements;
 
-        if (null === $settingsFromFactory) {
-            $settingsFromFactory = new ilCertificateSettingsFormRepository(
-                $object->getId(),
+        $database = $DIC->database();
+
+
+        if (null === $logger) {
+            $logger = $logger = $DIC->logger()->cert(); // #fürCarsten was bedeutet das?
+        }
+
+        if (null === $pageFormats) {
+            $pageFormats = new ilPageFormats($language);
+        }
+        $this->pageFormats = $pageFormats;
+
+        if (null === $formFieldParser) {
+            $formFieldParser = new ilFormFieldParser();
+        }
+        $this->formFieldParser = $formFieldParser;
+
+        if (null === $importAction) {
+            $importAction = new ilCertificateTemplateImportAction(
+                (int) $objectId,
                 $certificatePath,
-                $hasAdditionalElements,
-                $language,
-                $ctrl,
-                $access,
-                $toolbar,
-                $placeholderDescriptionObject
+                $placeholderDescriptionObject,
+                $logger,
+                $DIC->filesystem()->web()
             );
         }
-        $this->settingsFromFactory = $settingsFromFactory;
+        $this->importAction = $importAction;
 
-        if (null === $learningProgressObject) {
-            $learningProgressObject = ilObjectLP::getInstance($this->object->getId());
+        if (null === $templateRepository) {
+            $templateRepository = new ilCertificateTemplateRepository($database, $logger);
         }
-        $this->learningProgressObject = $learningProgressObject;
+        $this->templateRepository = $templateRepository;
 
-        if (null === $trackingHelper) {
-            $trackingHelper = new ilCertificateObjUserTrackingHelper();
+        if (null === $filesystem) {
+            $filesystem = $DIC->filesystem()->web();
         }
-        $this->trackingHelper = $trackingHelper;
 
-        if (null === $objectHelper) {
-            $objectHelper = new ilCertificateObjectHelper();
+        if (null === $backgroundImageFileService) {
+            $backgroundImageFileService = new ilCertificateBackgroundImageFileService(
+                $certificatePath,
+                $filesystem
+            );
         }
-        $this->objectHelper = $objectHelper;
-
-        if (null === $lpHelper) {
-            $lpHelper = new ilCertificateObjectLPHelper();
-        }
-        $this->lpHelper = $lpHelper;
-
-        if (null === $tree) {
-            global $DIC;
-            $tree = $DIC['tree'];
-        }
-        $this->tree = $tree;
-
-        if (null === $setting) {
-            $setting = new ilSetting('crs');
-        }
-        $this->setting = $setting;
+        $this->backGroundImageFileService = $backgroundImageFileService;
     }
 
     /**
      * @param ilCertificateGUI $certificateGUI
+     * @param ilCertificate    $certificateObject
+     * @param string           $certificatePath
      * @return ilPropertyFormGUI
-     * @throws FileAlreadyExistsException
-     * @throws FileNotFoundException
-     * @throws IOException
+     * @throws \ILIAS\Filesystem\Exception\FileAlreadyExistsException
+     * @throws \ILIAS\Filesystem\Exception\FileNotFoundException
+     * @throws \ILIAS\Filesystem\Exception\IOException
      * @throws ilDatabaseException
      * @throws ilException
      * @throws ilWACException
      */
-    public function createForm(ilCertificateGUI $certificateGUI) : ilPropertyFormGUI
+    public function createForm(ilCertificateGUI $certificateGUI)
     {
-        $form = $this->settingsFromFactory->createForm($certificateGUI);
+        $certificateTemplate = $this->templateRepository->fetchCurrentlyUsedCertificate($this->objectId);
 
-        $objectLearningProgressSettings = new ilLPObjSettings($this->object->getId());
+        $command = $this->controller->getCmd();
 
-        $mode = $objectLearningProgressSettings->getMode();
-        if (!$this->trackingHelper->enabledLearningProgress() || $mode == ilLPObjSettings::LP_MODE_DEACTIVATED) {
-            $subitems = new ilRepositorySelector2InputGUI($this->language->txt('objects'), 'subitems', true);
+        $form = new ilPropertyFormGUI();
+        $form->setPreventDoubleSubmission(false);
+        $form->setFormAction($this->controller->getFormAction($certificateGUI));
+        $form->setTitle($this->language->txt("cert_form_sec_availability"));
+        $form->setMultipart(true);
+        $form->setTableWidth("100%");
+        $form->setId("certificate");
 
-            $formSection = new ilFormSectionHeaderGUI();
-            $formSection->setTitle($this->language->txt('cert_form_sec_add_features'));
+        $active = new ilCheckboxInputGUI($this->language->txt("active"), "active");
+        $form->addItem($active);
+
+        $import = new ilFileInputGUI($this->language->txt("import"), "certificate_import");
+        $import->setRequired(false);
+        $import->setSuffixes(array("zip"));
+
+        // handle the certificate import
+        if (strlen($_FILES["certificate_import"]["name"])) {
+            if ($import->checkInput()) {
+                $result = $this->importAction->import($_FILES["certificate_import"]["tmp_name"], $_FILES["certificate_import"]["name"]);
+                if ($result == false) {
+                    $import->setAlert($this->language->txt("certificate_error_import"));
+                } else {
+                    $this->controller->redirect($certificateGUI, "certificateEditor");
+                }
+            }
+        }
+        $form->addItem($import);
+
+        $formSection = new \ilFormSectionHeaderGUI();
+        $formSection->setTitle($this->language->txt("cert_form_sec_layout"));
+        $form->addItem($formSection);
+
+        $pageformat = new ilRadioGroupInputGUI($this->language->txt("certificate_page_format"), "pageformat");
+        $pageformats = $this->pageFormats->fetchPageFormats();
+
+        foreach ($pageformats as $format) {
+            $option = new ilRadioOption($format["name"], $format["value"]);
+
+            if (strcmp($format["value"], "custom") == 0) {
+                $pageheight = new ilTextInputGUI($this->language->txt("certificate_pageheight"), "pageheight");
+                $pageheight->setSize(6);
+                $pageheight->setValidationRegexp('/^(([1-9]+|([1-9]+[0]*[\.,]{0,1}[\d]+))|(0[\.,](0*[1-9]+[\d]*)))(cm|mm|in|pt|pc|px|em)$/is');
+                $pageheight->setInfo($this->language->txt("certificate_unit_description"));
+                $pageheight->setRequired(true);
+                $option->addSubitem($pageheight);
+
+                $pagewidth = new ilTextInputGUI($this->language->txt("certificate_pagewidth"), "pagewidth");
+                $pagewidth->setSize(6);
+                $pagewidth->setValidationRegexp('/^(([1-9]+|([1-9]+[0]*[\.,]{0,1}[\d]+))|(0[\.,](0*[1-9]+[\d]*)))(cm|mm|in|pt|pc|px|em)$/is');
+                $pagewidth->setInfo($this->language->txt("certificate_unit_description"));
+                $pagewidth->setRequired(true);
+                $option->addSubitem($pagewidth);
+            }
+
+            $pageformat->addOption($option);
+        }
+
+        $pageformat->setRequired(true);
+
+        if (strcmp($command, "certificateSave") == 0) {
+            $pageformat->checkInput();
+        }
+
+        $form->addItem($pageformat);
+
+        $bgimage = new ilImageFileInputGUI($this->language->txt("certificate_background_image"), "background");
+        $bgimage->setRequired(false);
+        $bgimage->setUseCache(false);
+
+        $bgimage->setALlowDeletion(true);
+        if (!$this->backGroundImageFileService->hasBackgroundImage($certificateTemplate)) {
+            if (ilObjCertificateSettingsAccess::hasBackgroundImage()) {
+                ilWACSignedPath::setTokenMaxLifetimeInSeconds(15);
+                $imagePath = ilWACSignedPath::signFile(ilObjCertificateSettingsAccess::getBackgroundImageThumbPathWeb());
+                $bgimage->setImage($imagePath);
+                $bgimage->setALlowDeletion(false);
+            }
+        } else {
+            ilWACSignedPath::setTokenMaxLifetimeInSeconds(15);
+
+            $thumbnailPath = $this->backGroundImageFileService->getBackgroundImageThumbPath();
+
+            if (!file_exists($thumbnailPath)) {
+                $thumbnailPath = ilObjCertificateSettingsAccess::getBackgroundImageThumbPath();
+                $bgimage->setALlowDeletion(false);
+            }
+            $imagePath = ilWACSignedPath::signFile($thumbnailPath);
+            $bgimage->setImage($imagePath);
+        }
+
+        $form->addItem($bgimage);
+
+        $thumbnailImage = new ilImageFileInputGUI($this->language->txt('certificate_card_thumbnail_image'), 'certificate_card_thumbnail_image');
+        $thumbnailImage->setRequired(false);
+        $thumbnailImage->setUseCache(false);
+        $thumbnailImage->setSuffixes(array('svg'));
+
+        $allowThumbnailDeletion = false;
+
+        $cardThumbnailImagePath = $certificateTemplate->getThumbnailImagePath();
+        if ('' !== $cardThumbnailImagePath) {
+            $presentationThumbnailImagePath = CLIENT_WEB_DIR . $cardThumbnailImagePath;
+            $thumbnailImage->setImage(ilWACSignedPath::signFile($presentationThumbnailImagePath));
+            $allowThumbnailDeletion = true;
+        }
+
+        $thumbnailImage->setAllowDeletion($allowThumbnailDeletion);
+
+        $form->addItem($thumbnailImage);
+
+        $rect = new ilCSSRectInputGUI($this->language->txt("certificate_margin_body"), "margin_body");
+        $rect->setRequired(true);
+        $rect->setUseUnits(true);
+        $rect->setInfo($this->language->txt("certificate_unit_description"));
+
+        if (strcmp($command, "certificateSave") == 0) {
+            $rect->checkInput();
+        }
+
+        $form->addItem($rect);
+
+        $certificate = new ilTextAreaInputGUI($this->language->txt("certificate_text"), "certificate_text");
+        $certificate->removePlugin('ilimgupload');
+        $certificate->setRequired(true);
+        $certificate->setRows(20);
+        $certificate->setCols(80);
+
+        $placeholderHtmlDescription = $this->placeholderDescriptionObject->createPlaceholderHtmlDescription();
+
+        $placeholderDescriptionInHtml = $placeholderHtmlDescription;
+
+        $certificate->setInfo($placeholderDescriptionInHtml);
+
+        $certificate->setUseRte(true, '3.4.7');
+
+        $tags = array(
+            "br",
+            "em",
+            "font",
+            "li",
+            "ol",
+            "p",
+            "span",
+            "strong",
+            "u",
+            "ul"
+        );
+
+        $certificate->setRteTags($tags);
+
+        if (strcmp($command, "certificateSave") == 0) {
+            $certificate->checkInput();
+        }
+
+        $form->addItem($certificate);
+
+        if (true === $this->hasAdditionalElements) {
+            $formSection = new \ilFormSectionHeaderGUI();
+            $formSection->setTitle($this->language->txt("cert_form_sec_add_features"));
             $form->addItem($formSection);
+        }
 
-            $exp = $subitems->getExplorerGUI();
-            $exp->setSkipRootNode(true);
-            $exp->setRootId($this->object->getRefId());
-            $exp->setTypeWhiteList($this->getLPTypes($this->object->getId()));
+        if ($this->access->checkAccess("write", "", $_GET["ref_id"])) {
+            if ($certificateTemplate->isCurrentlyActive()) {
+                $this->toolbar->setFormAction($this->controller->getFormAction($certificateGUI));
 
-            $objectHelper = $this->objectHelper;
-            $lpHelper = $this->lpHelper;
-            $subitems->setTitleModifier(function ($id) use ($objectHelper, $lpHelper) {
-                if (null === $id) {
-                    return '';
-                }
-                $obj_id = $objectHelper->lookupObjId((int) $id);
-                $olp = $lpHelper->getInstance($obj_id);
+                $preview = ilSubmitButton::getInstance();
+                $preview->setCaption('certificate_preview');
+                $preview->setCommand('certificatePreview');
+                $this->toolbar->addStickyItem($preview);
 
-                $invalid_modes = $this->getInvalidLPModes();
+                $export = ilSubmitButton::getInstance();
+                $export->setCaption('certificate_export');
+                $export->setCommand('certificateExportFO');
+                $this->toolbar->addButtonInstance($export);
 
-                $mode = $olp->getModeText($olp->getCurrentMode());
-
-                if (in_array($olp->getCurrentMode(), $invalid_modes, true)) {
-                    $mode = '<strong>' . $mode . '</strong>';
-                }
-                return $objectHelper->lookupTitle($obj_id) . ' (' . $mode . ')';
-            });
-
-            $subitems->setRequired(true);
-            $form->addItem($subitems);
+                $delete = ilSubmitButton::getInstance();
+                $delete->setCaption('delete');
+                $delete->setCommand('certificateDelete');
+                $this->toolbar->addButtonInstance($delete);
+            }
+            $form->addCommandButton("certificateSave", $this->language->txt("save"));
         }
 
         return $form;
@@ -145,99 +366,18 @@ class ilCertificateSettingsCourseFormRepository implements ilCertificateFormRepo
 
     /**
      * @param array $formFields
-     * @throws ilException|JsonException
+     * @return mixed|void
      */
-    public function save(array $formFields) : void
+    public function save(array $formFields)
     {
-        $invalidModes = $this->getInvalidLPModes();
-
-        $titlesOfObjectsWithInvalidModes = [];
-        $refIds = $formFields['subitems'] ?? [];
-
-        foreach ($refIds as $refId) {
-            $objectId = $this->objectHelper->lookupObjId((int) $refId);
-            $learningProgressObject = $this->lpHelper->getInstance($objectId);
-            $currentMode = $learningProgressObject->getCurrentMode();
-            if (in_array($currentMode, $invalidModes, true)) {
-                $titlesOfObjectsWithInvalidModes[] = $this->objectHelper->lookupTitle($objectId);
-            }
-        }
-
-        if (count($titlesOfObjectsWithInvalidModes) > 0) {
-            $message = sprintf(
-                $this->language->txt('certificate_learning_progress_must_be_active'),
-                implode(', ', $titlesOfObjectsWithInvalidModes)
-            );
-            throw new ilException($message);
-        }
-
-        $this->setting->set(
-            'cert_subitems_' . $this->object->getId(),
-            json_encode($formFields['subitems'], JSON_THROW_ON_ERROR)
-        );
-    }
-
-    public function fetchFormFieldData(string $content) : array
-    {
-        $formFields = $this->settingsFromFactory->fetchFormFieldData($content);
-
-        $formFields['subitems'] = json_decode($this->setting->get(
-            'cert_subitems_' . $this->object->getId(),
-            json_encode([], JSON_THROW_ON_ERROR)
-        ), true, 512, JSON_THROW_ON_ERROR);
-        if ($formFields['subitems'] === 'null' || $formFields['subitems'] === null) {
-            $formFields['subitems'] = [];
-        }
-        return $formFields;
-    }
-
-    private function getLPTypes(int $a_parent_ref_id) : array
-    {
-        $result = [];
-
-        $root = $this->tree->getNodeData($a_parent_ref_id);
-        $sub_items = $this->tree->getSubTree($root);
-        array_shift($sub_items); // remove root
-
-        foreach ($sub_items as $node) {
-            if ($this->lpHelper->isSupportedObjectType($node['type'])) {
-                $class = $this->lpHelper->getTypeClass($node['type']);
-                $modes = $class::getDefaultModes($this->trackingHelper->enabledLearningProgress());
-
-                if (count($modes) > 1) {
-                    $result[] = $node['type'];
-                }
-            }
-        }
-
-        return $result;
     }
 
     /**
-     * @return int[]
+     * @param string $content
+     * @return array|mixed
      */
-    private function getInvalidLPModes() : array
+    public function fetchFormFieldData(string $content)
     {
-        $invalid_modes = [
-            ilLPObjSettings::LP_MODE_DEACTIVATED,
-            ilLPObjSettings::LP_MODE_UNDEFINED
-        ];
-
-        // without active LP the following modes cannot be supported
-        if (!$this->trackingHelper->enabledLearningProgress()) {
-            // status cannot be set without active LP
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_MANUAL;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_MANUAL_BY_TUTOR;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_COLLECTION_MANUAL;
-
-            // mode cannot be configured without active LP
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_COLLECTION;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_COLLECTION_MOBS;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_COLLECTION_TLT;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_SCORM;
-            $invalid_modes[] = ilLPObjSettings::LP_MODE_VISITS; // ?
-        }
-
-        return $invalid_modes;
+        return $this->formFieldParser->fetchDefaultFormFields($content);
     }
 }

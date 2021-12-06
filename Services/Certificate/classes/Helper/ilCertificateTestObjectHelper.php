@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
 
 /**
@@ -6,7 +6,11 @@
  */
 class ilCertificateTestObjectHelper
 {
-    public function getResultPass(int $active_id) : ?int
+    /**
+     * @param $active_id
+     * @return int|null
+     */
+    public function getResultPass($active_id)
     {
         return ilObjTest::_getResultPass($active_id);
     }

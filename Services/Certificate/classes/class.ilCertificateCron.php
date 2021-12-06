@@ -1,36 +1,61 @@
-<?php declare(strict_types=1);
-
+<?php
 /* Copyright (c) 1998-2018 ILIAS open source, Extended GPL, see docs/LICENSE */
-
-use ILIAS\DI\Container;
 
 /**
  * @author  Niels Theen <ntheen@databay.de>
  */
-class ilCertificateCron extends ilCronJob
+class ilCertificateCron extends \ilCronJob
 {
-    public const DEFAULT_SCHEDULE_HOURS = 1;
+    const DEFAULT_SCHEDULE_HOURS = 1;
 
-    protected ?ilLanguage $lng;
-    private ?ilCertificateQueueRepository $queueRepository;
-    private ?ilCertificateTemplateRepository $templateRepository;
-    private ?ilUserCertificateRepository $userRepository;
-    private ?ilLogger $logger;
-    private ?ilCertificateValueReplacement $valueReplacement;
-    private ?ilCertificateObjectHelper $objectHelper;
-    private Container $dic;
-    private ?ilSetting $settings;
+    /** @var \ilLanguage */
+    protected $lng;
 
+    /** \@var ilCertificateQueueRepository */
+    private $queueRepository;
+
+    /** @var \ilCertificateTemplateRepository */
+    private $templateRepository;
+
+    /** @var \ilUserCertificateRepository */
+    private $userRepository;
+
+    /** @var \ILIAS\DI\LoggingServices|ilLogger logger */
+    private $logger;
+
+    /** @var \ilCertificateValueReplacement */
+    private $valueReplacement;
+
+    /** @var ilCertificateObjectHelper|null */
+    private $objectHelper;
+
+    /** @var \ILIAS\DI\Container */
+    private $dic;
+
+    /** @var ilSetting */
+    private $settings;
+
+    /**
+     * @param ilCertificateQueueRepository $queueRepository
+     * @param ilCertificateTemplateRepository $templateRepository
+     * @param ilUserCertificateRepository $userRepository
+     * @param ilCertificateValueReplacement|null $valueReplacement
+     * @param ilLogger|null $logger
+     * @param \ILIAS\DI\Container|null $dic
+     * @param ilLanguage|null $language
+     * @param ilCertificateObjectHelper|null $objectHelper
+     * @param ilSetting|null $setting
+     */
     public function __construct(
-        ?ilCertificateQueueRepository $queueRepository = null,
-        ?ilCertificateTemplateRepository $templateRepository = null,
-        ?ilUserCertificateRepository $userRepository = null,
-        ?ilCertificateValueReplacement $valueReplacement = null,
-        ?ilLogger $logger = null,
-        ?Container $dic = null,
-        ?ilLanguage $language = null,
-        ?ilCertificateObjectHelper $objectHelper = null,
-        ?ilSetting $setting = null
+        ilCertificateQueueRepository $queueRepository = null,
+        ilCertificateTemplateRepository $templateRepository = null,
+        ilUserCertificateRepository $userRepository = null,
+        ilCertificateValueReplacement $valueReplacement = null,
+        ilLogger $logger = null,
+        \ILIAS\DI\Container $dic = null,
+        ilLanguage $language = null,
+        ilCertificateObjectHelper $objectHelper = null,
+        ilSetting $setting = null
     ) {
         if (null === $dic) {
             global $DIC;
@@ -46,25 +71,33 @@ class ilCertificateCron extends ilCronJob
         $this->objectHelper = $objectHelper;
         $this->settings = $setting;
 
-        if ($dic && isset($dic['lng'])) {
-            $language = $dic->language();
-            $language->loadLanguageModule('certificate');
+        if ($dic) {
+            if (isset($dic['lng'])) {
+                $language = $dic->language();
+                $language->loadLanguageModule('certificate');
+            }
         }
 
         $this->lng = $language;
     }
 
-    public function getTitle() : string
+    /**
+     * @inheritdoc
+     */
+    public function getTitle()
     {
         return $this->lng->txt('cert_cron_task_title');
     }
 
-    public function getDescription() : string
+    /**
+     * @inheritdoc
+     */
+    public function getDescription()
     {
         return $this->lng->txt('cert_cron_task_desc');
     }
 
-    public function init() : void
+    public function init()
     {
         if (null === $this->dic) {
             global $DIC;
@@ -82,7 +115,7 @@ class ilCertificateCron extends ilCronJob
         }
 
         if (null === $this->templateRepository) {
-            $this->templateRepository = new ilCertificateTemplateDatabaseRepository($database, $this->logger);
+            $this->templateRepository = new ilCertificateTemplateRepository($database, $this->logger);
         }
 
         if (null === $this->userRepository) {
@@ -102,7 +135,11 @@ class ilCertificateCron extends ilCronJob
         }
     }
 
-    public function run() : ilCronJobResult
+    /**
+     * @inheritdoc
+     * @throws ilDatabaseException
+     */
+    public function run()
     {
         $this->init();
 
@@ -166,40 +203,54 @@ class ilCertificateCron extends ilCronJob
         return $result;
     }
 
-    public function getId() : string
+    /**
+     * @inheritdoc
+     */
+    public function getId()
     {
         return 'certificate';
     }
 
-    public function hasAutoActivation() : bool
+    /**
+     * @inheritdoc
+     */
+    public function hasAutoActivation()
     {
         return true;
     }
 
-    public function hasFlexibleSchedule() : bool
+    /**
+     * @inheritdoc
+     */
+    public function hasFlexibleSchedule()
     {
         return true;
     }
 
-    public function getDefaultScheduleType() : int
+    /**
+     * @inheritdoc
+     */
+    public function getDefaultScheduleType()
     {
         return self::SCHEDULE_TYPE_IN_MINUTES;
     }
 
-    public function getDefaultScheduleValue() : ?int
+    /**
+     * @inheritdoc
+     */
+    public function getDefaultScheduleValue()
     {
         return 1;
     }
 
     /**
-     * @param int                     $entryCounter
+     * @param int $entryCounter
      * @param ilCertificateQueueEntry $entry
-     * @param array                   $succeededGenerations
+     * @param array $succeededGenerations
      * @return array
      * @throws ilDatabaseException
      * @throws ilException
      * @throws ilInvalidCertificateException
-     * @throws ilObjectNotFoundException|JsonException
      */
     public function processEntry(int $entryCounter, ilCertificateQueueEntry $entry, array $succeededGenerations) : array
     {
@@ -242,7 +293,7 @@ class ilCertificateCron extends ilCronJob
         $type = $object->getType();
 
         $userObject = $this->objectHelper->getInstanceByObjId($userId, false);
-        if (!($userObject instanceof ilObjUser)) {
+        if (!$userObject || !($userObject instanceof \ilObjUser)) {
             throw new ilException('The given user id"' . $userId . '" could not be referred to an actual user');
         }
 
@@ -257,7 +308,7 @@ class ilCertificateCron extends ilCronJob
 
         $this->logger->debug(sprintf(
             'Values for placeholders: "%s"',
-            json_encode($placeholderValues, JSON_THROW_ON_ERROR)
+            json_encode($placeholderValues)
         ));
 
         $certificateContent = $this->valueReplacement->replace(
@@ -265,16 +316,16 @@ class ilCertificateCron extends ilCronJob
             $certificateContent
         );
 
-        $thumbnailImagePath = $template->getThumbnailImagePath();
+        $thumbnailImagePath = (string) $template->getThumbnailImagePath();
         $userCertificate = new ilUserCertificate(
             $template->getId(),
             $objId,
             $type,
             $userId,
             $userObject->getFullname(),
-            $entry->getStartedTimestamp(),
+            (int) $entry->getStartedTimestamp(),
             $certificateContent,
-            json_encode($placeholderValues, JSON_THROW_ON_ERROR),
+            json_encode($placeholderValues),
             null,
             $template->getVersion(),
             ILIAS_VERSION_NUMERIC,
@@ -289,6 +340,12 @@ class ilCertificateCron extends ilCronJob
             'obj_id: ' . $objId,
             'usr_id: ' . $userId
         ]);
+        /*
+         * #Review#
+         * Warum brauchen wir ein Funktion?
+         * wir können so schreiben:
+         * $succeededGenerations[] =  'obj_id: ' . $objId . "/" . 'usr_id: ' . $userId;
+         */
 
         $this->queueRepository->removeFromQueue($entry->getId());
 
